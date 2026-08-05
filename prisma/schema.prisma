@@ -1,0 +1,348 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum TipoUsuario {
+  ADMIN
+  SECRETARIA
+  TESOURARIA
+  PROFESSOR
+  ALUNO
+  ENCARREGADO
+}
+
+enum StatusMatricula {
+  ATIVA
+  TRANSFERIDA
+  CONCLUIDA
+  CANCELADA
+}
+
+enum TipoFalta {
+  JUSTIFICADA
+  INJUSTIFICADA
+}
+
+enum SituacaoNota {
+  APROVADO
+  EM_EXAME
+  REPROVADO
+}
+
+enum StatusPagamento {
+  PAGO
+  PENDENTE
+  ATRASADO
+  CANCELADO
+}
+
+enum MetodoPagamento {
+  CAIXA
+  TRANSFERENCIA
+  DEPOSITO
+}
+
+enum AcaoAuditoria {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  PAYMENT
+  GENERATE_RECEIPT
+}
+
+model ConfiguracaoEscola {
+  id                  Int      @id @default(autoincrement())
+  nome                String   @db.VarChar(200)
+  endereco            String?  @db.VarChar(255)
+  telefone            String?  @db.VarChar(30)
+  email               String?  @db.VarChar(150)
+  website             String?  @db.VarChar(150)
+  diretor             String   @db.VarChar(150)
+  anoLetivoAtivo      String   @db.VarChar(9)
+  numeroTrimestres    Int      @default(3)
+  notaMinimaAprovacao Decimal  @default(10.00) @db.Decimal(4, 2)
+  valorPropina        Decimal  @default(1200.00) @db.Decimal(10, 2)
+  banco               String?  @db.VarChar(100)
+  contaBancaria       String?  @db.VarChar(50)
+  nib                 String?  @db.VarChar(50)
+  logoUrl             String?  @db.VarChar(255)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("configuracoes_escola")
+}
+
+model Usuario {
+  id                   Int                @id @default(autoincrement())
+  nome                 String             @db.VarChar(150)
+  email                String             @unique @db.VarChar(150)
+  senha                String             @db.VarChar(255)
+  tipoUsuario          TipoUsuario
+  ativo                Boolean            @default(true)
+  ultimoLogin          DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  deletedAt            DateTime?
+
+  aluno                Aluno?
+  professorTurmas      TurmaDisciplina[]  @relation("ProfessorTurmas")
+  avisosCriados        Aviso[]            @relation("AutorAvisos")
+  pagamentosRegistados Pagamento[]        @relation("ResponsavelPagamento")
+  auditorias           Auditoria[]        @relation("UsuarioAuditoria")
+
+  @@index([tipoUsuario])
+  @@index([ativo])
+  @@index([deletedAt])
+  @@map("usuarios")
+}
+
+model Aluno {
+  id                  Int          @id @default(autoincrement())
+  usuarioId           Int          @unique
+  numeroBI            String       @unique @db.VarChar(30)
+  dataNascimento      DateTime
+  contacto            String?      @db.VarChar(30)
+  nomeEncarregado     String       @db.VarChar(150)
+  contactoEncarregado String?      @db.VarChar(30)
+
+  usuario             Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  matriculas           Matricula[]
+  notas                Nota[]
+  faltas               Falta[]
+  pagamentos           Pagamento[]
+
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  deletedAt            DateTime?
+
+  @@index([deletedAt])
+  @@map("alunos")
+}
+
+model Turma {
+  id           Int                @id @default(autoincrement())
+  nome         String             @db.VarChar(100)
+  anoLetivo    String             @db.VarChar(9)
+
+  matriculas   Matricula[]
+  disciplinas  TurmaDisciplina[]
+
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+
+  @@unique([nome, anoLetivo])
+  @@index([anoLetivo])
+  @@index([deletedAt])
+  @@map("turmas")
+}
+
+model Disciplina {
+  id               Int                @id @default(autoincrement())
+  nome             String             @unique @db.VarChar(100)
+
+  turmaDisciplinas TurmaDisciplina[]
+  notas             Nota[]
+  faltas            Falta[]
+
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+
+  @@index([deletedAt])
+  @@map("disciplinas")
+}
+
+model Matricula {
+  id             Int             @id @default(autoincrement())
+  alunoId        Int
+  turmaId        Int
+  anoLetivo      String          @db.VarChar(9)
+  dataMatricula  DateTime        @default(now())
+  status         StatusMatricula @default(ATIVA)
+
+  aluno          Aluno           @relation(fields: [alunoId], references: [id], onDelete: Restrict)
+  turma          Turma           @relation(fields: [turmaId], references: [id], onDelete: Restrict)
+
+  notas          Nota[]
+  faltas         Falta[]
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([alunoId, anoLetivo])
+  @@index([turmaId])
+  @@index([anoLetivo])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("matriculas")
+}
+
+model TurmaDisciplina {
+  id             Int          @id @default(autoincrement())
+  turmaId        Int
+  disciplinaId  Int
+  professorId    Int
+
+  turma          Turma        @relation(fields: [turmaId], references: [id], onDelete: Restrict)
+  disciplina     Disciplina   @relation(fields: [disciplinaId], references: [id], onDelete: Restrict)
+  professor      Usuario      @relation("ProfessorTurmas", fields: [professorId], references: [id], onDelete: Restrict)
+
+  notas          Nota[]
+  faltas         Falta[]
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([turmaId, disciplinaId])
+  @@index([professorId])
+  @@index([disciplinaId])
+  @@index([deletedAt])
+  @@map("turma_disciplinas")
+}
+
+model Nota {
+  id                Int             @id @default(autoincrement())
+  alunoId           Int
+  matriculaId       Int
+  turmaDisciplinaId Int
+  trimestre         Int
+  anoLetivo         String          @db.VarChar(9)
+
+  acs1              Decimal         @db.Decimal(4, 2)
+  acs2              Decimal         @db.Decimal(4, 2)
+  acp               Decimal         @db.Decimal(4, 2)
+  media             Decimal         @db.Decimal(4, 2)
+  situacao          SituacaoNota
+
+  aluno             Aluno           @relation(fields: [alunoId], references: [id], onDelete: Restrict)
+  matricula         Matricula       @relation(fields: [matriculaId], references: [id], onDelete: Restrict)
+  turmaDisciplina   TurmaDisciplina @relation(fields: [turmaDisciplinaId], references: [id], onDelete: Restrict)
+  disciplina        Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Restrict)
+
+  disciplinaId      Int
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([alunoId, turmaDisciplinaId, trimestre, anoLetivo])
+  @@index([matriculaId])
+  @@index([turmaDisciplinaId])
+  @@index([disciplinaId])
+  @@index([anoLetivo])
+  @@map("notas")
+}
+
+model Falta {
+  id                Int             @id @default(autoincrement())
+  alunoId           Int
+  matriculaId       Int
+  turmaDisciplinaId Int
+  data              DateTime
+  tipo              TipoFalta
+  observacao        String?         @db.VarChar(255)
+
+  aluno             Aluno           @relation(fields: [alunoId], references: [id], onDelete: Restrict)
+  matricula         Matricula       @relation(fields: [matriculaId], references: [id], onDelete: Restrict)
+  turmaDisciplina   TurmaDisciplina @relation(fields: [turmaDisciplinaId], references: [id], onDelete: Restrict)
+  disciplina        Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Restrict)
+
+  disciplinaId      Int
+
+  createdAt         DateTime        @default(now())
+
+  @@index([alunoId])
+  @@index([matriculaId])
+  @@index([turmaDisciplinaId])
+  @@index([disciplinaId])
+  @@index([data])
+  @@map("faltas")
+}
+
+model Pagamento {
+  id                  Int             @id @default(autoincrement())
+  alunoId             Int
+  mesReferencia       String          @db.VarChar(7)
+  anoLetivo           String          @db.VarChar(9)
+  valor               Decimal         @db.Decimal(10, 2)
+  status              StatusPagamento @default(PENDENTE)
+  metodoPagamento     MetodoPagamento?
+  dataPagamento       DateTime?
+  referenciaPagamento String?         @db.VarChar(100)
+  observacao          String?         @db.VarChar(255)
+  responsavelId       Int?
+
+  aluno               Aluno           @relation(fields: [alunoId], references: [id], onDelete: Restrict)
+  responsavel          Usuario?        @relation("ResponsavelPagamento", fields: [responsavelId], references: [id], onDelete: SetNull)
+  recibo              Recibo?
+
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+
+  @@unique([alunoId, mesReferencia])
+  @@index([anoLetivo])
+  @@index([status])
+  @@index([responsavelId])
+  @@index([deletedAt])
+  @@map("pagamentos")
+}
+
+model Recibo {
+  id           Int        @id @default(autoincrement())
+  pagamentoId  Int        @unique
+  numero       String     @unique @db.VarChar(30)
+  emitidoEm    DateTime   @default(now())
+
+  pagamento    Pagamento  @relation(fields: [pagamentoId], references: [id], onDelete: Restrict)
+
+  createdAt    DateTime   @default(now())
+
+  @@index([emitidoEm])
+  @@map("recibos")
+}
+
+model Aviso {
+  id           Int        @id @default(autoincrement())
+  titulo       String     @db.VarChar(150)
+  conteudo     String     @db.Text
+  autorId      Int
+  publicadoEm  DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  autor        Usuario    @relation("AutorAvisos", fields: [autorId], references: [id], onDelete: Restrict)
+
+  @@index([autorId])
+  @@index([deletedAt])
+  @@map("avisos")
+}
+
+model Auditoria {
+  id              Int             @id @default(autoincrement())
+  usuarioId       Int?
+  acao            AcaoAuditoria
+  entidade        String          @db.VarChar(100)
+  entidadeId      Int?
+  dadosAnteriores Json?
+  dadosNovos      Json?
+  ip              String?         @db.VarChar(45)
+  createdAt       DateTime        @default(now())
+
+  usuario         Usuario?        @relation("UsuarioAuditoria", fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId])
+  @@index([entidade])
+  @@index([entidadeId])
+  @@index([createdAt])
+  @@map("auditorias")
+}
