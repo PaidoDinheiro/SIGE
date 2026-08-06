@@ -140,12 +140,15 @@ export function AppSidebar() {
             <SidebarMenu>
               {filteredMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={pathname === item.url || (pathname.startsWith(item.url) && item.url !== `/dashboard/${role.toLowerCase()}`)}>
-                    <Link href={item.url} className="flex items-center gap-3">
-                      <item.icon className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
+                  <SidebarMenuButton 
+                    isActive={pathname === item.url || (pathname.startsWith(item.url) && item.url !== `/dashboard/${role.toLowerCase()}`)}
+                    render={
+                      <Link href={item.url} className="flex items-center gap-3">
+                        <item.icon className="w-4 h-4 shrink-0" />
+                        <span className="truncate">{item.title}</span>
+                      </Link>
+                    }
+                  />
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
